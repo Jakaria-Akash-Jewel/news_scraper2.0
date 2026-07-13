@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>News Scraper — Live Headlines</title>
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="Live headlines from CNN, The Daily Star, and Prothom Alo in one place.">
+
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" href="/static/icons/icon-192.png">
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --panel-2: #16213a;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --accent: #dc2626;
+            --accent-2: #f87171;
+            --border: #2c3a54;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: linear-gradient(180deg, var(--bg) 80%, transparent);
+            padding: 20px 16px 10px;
+        }
+        .header-inner {
+            max-width: 760px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin: 0 0 4px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        h1 .bar { width: 6px; height: 22px; background: var(--accent); border-radius: 3px; display: inline-block; }
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+        }
+        form.search {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+        input[type="text"]:focus { outline: 2px solid var(--accent-2); }
+        .tabs {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        .tab {
+            white-space: nowrap;
+            padding: 7px 14px;
+            border-radius: 20px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+        }
+        .tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+        .buttons {
+            max-width: 760px;
+            margin: 10px auto 0;
+            display: flex;
+            gap: 8px;
+            padding: 0 16px;
+        }
+        .btn {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+        .btn:hover { filter: brightness(1.15); }
+
+        main {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 14px 16px 60px;
+        }
+        .error-box {
+            background: #3b1d1d;
+            border: 1px solid #7f1d1d;
+            color: #fca5a5;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+        }
+        ul.headlines {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        li.card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        li.card a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+        li.card a:hover { color: var(--accent-2); }
+        .source-tag {
+            display: inline-block;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+            margin-bottom: 6px;
+        }
+        .empty {
+            text-align: center;
+            color: var(--muted);
+            padding: 60px 20px;
+        }
+        #install-btn {
+            display: none;
+        }
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.75rem;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <h1><span class="bar"></span>News Scraper</h1>
+            <div class="meta-row">
+                <span>{{ total }} headlines{% if active_source != 'all' %} · {{ active_source }}{% endif %}</span>
+                <span>{% if fetched_at %}updated {{ fetched_at.strftime('%H:%M:%S') }}{% endif %}</span>
+            </div>
+
+            <form class="search" method="get" action="/">
+                <input type="hidden" name="source" value="{{ active_source }}">
+                <input type="text" name="q" placeholder="Search headlines…" value="{{ query }}">
+                <button class="btn primary" type="submit">Search</button>
+            </form>
+
+            <div class="tabs">
+                <a class="tab {% if active_source == 'all' %}active{% endif %}" href="/?source=all">All</a>
+                {% for s in sources %}
+                <a class="tab {% if active_source == s %}active{% endif %}" href="/?source={{ s }}">{{ s }}</a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="buttons">
+            <a href="/refresh?source={{ active_source }}" class="btn">🔁 Refresh</a>
+            <a href="/download?source={{ active_source }}" class="btn">💾 Download CSV</a>
+            <button id="install-btn" class="btn">📲 Install App</button>
+        </div>
+    </header>
+
+    <main>
+        {% if errors %}
+        <div class="error-box">
+            Some sources failed to load: {{ errors|join(' · ') }}
+        </div>
+        {% endif %}
+
+        {% if headlines %}
+        <ul class="headlines">
+            {% for h in headlines %}
+            <li class="card">
+                <span class="source-tag">{{ h.source }}</span><br>
+                <a href="{{ h.url }}" target="_blank" rel="noopener">{{ h.title }}</a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty">No headlines found. Try refreshing or clearing your search.</div>
+        {% endif %}
+    </main>
+
+    <footer>News Scraper · sources refresh every {{ 10 }} min</footer>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js');
+        }
+
+        let deferredPrompt;
+        const installBtn = document.getElementById('install-btn');
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'inline-block';
+        });
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            installBtn.style.display = 'none';
+        });
+    </script>
+</body>
+</html>
